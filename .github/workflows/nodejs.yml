@@ -3,6 +3,7 @@ name: webpack-dev-server
 on:
   push:
     branches:
+      - express-5-testing
       - master
       - next
       - v4
@@ -11,6 +12,7 @@ on:
       - master
       - next
       - v4
+      - express-5-testing
 
 permissions:
   contents: read
