@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+# Cancel in progress workflows
+# in the scenario where we already had a run going for that PR/branch/tag but then triggered a new run
+concurrency:
+  group: "${{ github.workflow }} ✨ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test - ${{ matrix.os }} (Node.js ${{ matrix.node-version }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [24]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Link webpack-dev-server
+        run: |
+          cp -R client tmp-client
+          npm link --ignore-scripts
+          npm link webpack-dev-server --ignore-scripts
+          rm -r client
+          cp -R tmp-client client
+
+      - name: Run tests
+        run: npm run test:only -- --updateSnapshot
+
+      - name: Create Pull Request
+        uses: gr2m/create-or-update-pull-request-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          commit-message: 'docs: update external docs'
+          title: 'docs: update external docs'
+          body: >
+            This auto-generated PR updates external documentation to the expressjs.com repository.
+
+            cc: @expressjs/docs-wg
+          labels: docs
+          branch: external-docs
