@@ -4,6 +4,7 @@ const webpack = require("webpack");
 const Server = require("../../lib/Server");
 const config = require("../fixtures/simple-config-other/webpack.config");
 const runBrowser = require("../helpers/run-browser");
+const sessionSubscribe = require("../helpers/session-subscribe");
 const port = require("../ports-map")["client-option"];
 
 describe("client option", () => {
@@ -42,7 +43,7 @@ describe("client option", () => {
       await server.stop();
     });
 
-    it("responds with a 200 status code for /ws path", async () => {
+    it("responds with a 200 status code for / path", async () => {
       page
         .on("console", (message) => {
           consoleMessages.push(message);
@@ -51,7 +52,22 @@ describe("client option", () => {
           pageErrors.push(error);
         });
 
-      const response = await page.goto(`http://localhost:${port}/ws`, {
+      const webSocketRequests = [];
+      const session = await page.target().createCDPSession();
+
+      session.on("Network.webSocketCreated", (test) => {
+        webSocketRequests.push(test);
+      });
+
+      await session.send("Target.setAutoAttach", {
+        autoAttach: true,
+        flatten: true,
+        waitForDebuggerOnStart: true,
+      });
+
+      sessionSubscribe(session);
+
+      const response = await page.goto(`http://localhost:${port}/`, {
         waitUntil: "networkidle0",
       });
 
@@ -59,6 +75,8 @@ describe("client option", () => {
       expect(server.options.client.overlay).toBe(true);
 
       expect(response.status()).toMatchSnapshot("response status");
+
+      expect(webSocketRequests).toMatchSnapshot("webSockets");
 
       expect(consoleMessages.map((message) => message.text())).toMatchSnapshot(
         "console messages",
@@ -119,14 +137,26 @@ describe("client option", () => {
           pageErrors.push(error);
         });
 
-      const response = await page.goto(
-        `http://localhost:${port}/foo/test/bar`,
-        {
-          waitUntil: "networkidle0",
-        },
-      );
+      const webSocketRequests = [];
+      const session = await page.target().createCDPSession();
 
-      expect(response.status()).toMatchSnapshot("response status");
+      session.on("Network.webSocketCreated", (test) => {
+        webSocketRequests.push(test);
+      });
+
+      await session.send("Target.setAutoAttach", {
+        autoAttach: true,
+        flatten: true,
+        waitForDebuggerOnStart: true,
+      });
+
+      sessionSubscribe(session);
+
+      await page.goto(`http://localhost:${port}/`, {
+        waitUntil: "networkidle0",
+      });
+
+      expect(webSocketRequests).toMatchSnapshot("webSockets");
 
       expect(consoleMessages.map((message) => message.text())).toMatchSnapshot(
         "console messages",
@@ -177,9 +207,30 @@ describe("client option", () => {
           pageErrors.push(error);
         });
 
+      const webSocketRequests = [];
+      const session = await page.target().createCDPSession();
+
+      session.on("Network.webSocketCreated", (test) => {
+        webSocketRequests.push(test);
+      });
+
+      await session.send("Target.setAutoAttach", {
+        autoAttach: true,
+        flatten: true,
+        waitForDebuggerOnStart: true,
+      });
+
+      sessionSubscribe(session);
+
+      await page.goto(`http://localhost:${port}/`, {
+        waitUntil: "networkidle0",
+      });
+
       const response = await page.goto(`http://localhost:${port}/main.js`, {
         waitUntil: "networkidle0",
       });
+
+      expect(webSocketRequests).toMatchSnapshot("webSockets");
 
       expect(response.status()).toMatchSnapshot("response status");
 
